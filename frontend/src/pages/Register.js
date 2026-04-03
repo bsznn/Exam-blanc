@@ -22,7 +22,7 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/auth/register', formData);
+      await axios.post('https://exam-blanc.onrender.com/api/auth/register', formData);
       alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
       navigate('/login');
     } catch (err) {

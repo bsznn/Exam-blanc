@@ -15,7 +15,7 @@ app.use(helmet());
 app.use(express.json({ limit: '10kb' }));
 
 app.use(cors({
-  origin: "http://localhost:3000/",
+  origin: "https://exam-blanc.onrender.com/",
   credentials: true
 }));
 
