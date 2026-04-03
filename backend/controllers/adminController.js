@@ -1,15 +1,32 @@
-// backend/controllers/adminController.js
 const axios = require('axios');
-const Order = require('../models/Order'); // Modèle pour les commandes
-const Product = require('../models/Product'); // Modèle pour les produits
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+
+const ALLOWED_STATUS = ['En attente', 'Validée', 'Expédiée', 'Annulée'];
+
+// Helper notification sécurisé
+const notify = async (message) => {
+  try {
+    await axios.post(
+      process.env.NOTIFY_SERVICE_URL,
+      { message },
+      { timeout: 3000 } // évite blocage
+    );
+  } catch (err) {
+    console.error('Notification error:', err.message);
+  }
+};
+
+// Middleware attendu: req.user.role === 'admin'
 
 // Récupérer toutes les commandes
 exports.getOrders = async (req, res) => {
   try {
-    const orders = await Order.find();
+    const orders = await Order.find().lean();
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des commandes' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
 
@@ -18,14 +35,28 @@ exports.updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
+  if (!ALLOWED_STATUS.includes(status)) {
+    return res.status(400).json({ message: 'Statut invalide' });
+  }
+
   try {
-    await Order.findByIdAndUpdate(id, { status });
-    await axios.post('http://localhost:3001/notify', {
-      message: `Le statut de la commande ${id} a été mis à jour en "${status}".`,
-    });
-    res.json({ message: `Statut de la commande ${id} mis à jour` });
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ message: 'Commande introuvable' });
+    }
+
+    await notify(`Commande ${id} mise à jour (${status})`);
+
+    res.json({ message: 'Statut mis à jour', order });
+
   } catch (error) {
-    res.status(500).json({ message: 'Erreur de mise à jour du statut de la commande' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
 
@@ -34,38 +65,63 @@ exports.validateOrder = async (req, res) => {
   const { id } = req.params;
 
   try {
-    await Order.findByIdAndUpdate(id, { status: 'Validée' });
-    await axios.post('http://localhost:3001/notify', {
-      message: `La commande ${id} a été validée.`,
-    });
-    res.json({ message: `Commande ${id} validée` });
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { status: 'Validée' },
+      { new: true, runValidators: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ message: 'Commande introuvable' });
+    }
+
+    await notify(`Commande ${id} validée`);
+
+    res.json({ message: 'Commande validée', order });
+
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la validation de la commande' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
 
 // Récupérer tous les produits
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find();
+    const products = await Product.find().lean();
     res.json(products);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la récupération des produits' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };
 
-// Mettre à jour le stock d'un produit
+// Mettre à jour le stock
 exports.updateProductStock = async (req, res) => {
   const { id } = req.params;
   const { stock } = req.body;
 
+  if (typeof stock !== 'number' || stock < 0) {
+    return res.status(400).json({ message: 'Stock invalide' });
+  }
+
   try {
-    await Product.findByIdAndUpdate(id, { stock });
-    await axios.post('http://localhost:3001/notify', {
-      message: `Le stock du produit ${id} a été mis à jour à ${stock}.`,
-    });
-    res.json({ message: `Stock du produit ${id} mis à jour` });
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { stock },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: 'Produit introuvable' });
+    }
+
+    await notify(`Stock produit ${id} → ${stock}`);
+
+    res.json({ message: 'Stock mis à jour', product });
+
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la mise à jour du stock du produit' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };

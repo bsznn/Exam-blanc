@@ -1,30 +1,53 @@
-// backend/controllers/authController.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User'); // modèle utilisateur
+const User = require('../models/User');
 require('dotenv').config();
-const axios = require('axios');
-const authLog = require('debug')('authRoutes:console')
-//const sendEmail = require('../services/emailService');
+const authLog = require('debug')('authRoutes:console');
+
+const SALT_ROUNDS = 12;
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
-  authLog(`username is ${username} password is ${password}`);
 
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Requête invalide' });
+  }
 
   try {
     const user = await User.findOne({ username });
-    authLog(`user is ${JSON.stringify(user)}`)
-    if (!user) return res.status(400).json({ message: 'Utilisateur non trouvé' });
+
+    // Message générique pour éviter l’énumération
+    if (!user) {
+      return res.status(400).json({ message: 'Identifiants invalides' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Mot de passe incorrect' });
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    authLog(`token is ${token}`)
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Identifiants invalides' });
+    }
 
-    res.json({ token, role: user.role, username: user.username });
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '1h',
+        issuer: 'your-app',
+        audience: 'your-app-users',
+      }
+    );
+
+    // Log SAFE
+    authLog(`User ${user._id} logged in`);
+
+    res.json({
+      token,
+      role: user.role,
+      username: user.username
+    });
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 };
@@ -32,39 +55,40 @@ exports.login = async (req, res) => {
 
 exports.register = async (req, res) => {
   const { username, email, password } = req.body;
-  authLog(`username is ${username} email is ${email} password is ${password}`);
+
+  // Validation basique
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Données invalides' });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Mot de passe trop court' });
+  }
 
   try {
-    // Vérifier si l'email ou le nom d'utilisateur existe déjà
     const existingUser = await User.findOne({ email });
-    
+
     if (existingUser) {
-      authLog(`user exist => ${JSON.stringify(existingUser)}`)
-      return res.status(400).json({ message: 'Cet email est déjà utilisé.' });
+      return res.status(400).json({ message: 'Impossible de créer le compte' });
     }
 
-    // Créer un nouvel utilisateur
-    const user = new User({ username, email, password });
+    // 🔐 Hash du mot de passe
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
     await user.save();
 
-    authLog(`user after creation => ${JSON.stringify(user)}`)
-
-    // Envoyer un email de bienvenue
-    // await sendEmail(
-    //   email,
-    //   'Bienvenue dans notre application',
-    //   `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`
-    // );
-
-    // await axios.post('http://localhost:4002/notify', {
-    //   to: email,
-    //   subject: 'Bienvenue dans notre application',
-    //   text: `Bonjour ${username},\n\nMerci de vous être inscrit. Nous sommes ravis de vous accueillir !`,
-    // });
+    authLog(`User created: ${user._id}`);
 
     res.status(201).json({ message: 'Utilisateur créé avec succès.' });
+
   } catch (error) {
-    console.error('Erreur lors de l\'inscription', error);
-    res.status(500).json({ message: 'Une erreur est survenue.' });
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 };

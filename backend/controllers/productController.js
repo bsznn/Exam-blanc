@@ -1,33 +1,65 @@
-// controllers/productController.js
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 
+// GET produits sécurisé
 exports.getProducts = async (req, res) => {
-    const products = await Product.find();
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const page = parseInt(req.query.page) || 1;
+
+    const products = await Product.find()
+      .limit(limit)
+      .skip((page - 1) * limit)
+      .lean();
+
     res.json(products);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
 };
 
+
+// UPDATE stock sécurisé
 exports.updateProductStock = async (req, res) => {
-    try {
-      const { stock } = req.body;
-      const {productId} = req.params;
-  
-      if (stock < 0) {
-        return res.status(400).json({ message: "Le stock ne peut pas être négatif." });
+  const { stock } = req.body;
+  const { productId } = req.params;
+
+  // 🔐 Validation ID Mongo
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return res.status(400).json({ message: 'ID invalide' });
+  }
+
+  // 🔐 Validation stricte du stock
+  if (!Number.isInteger(stock) || stock < 0) {
+    return res.status(400).json({ message: 'Stock invalide' });
+  }
+
+  try {
+    const product = await Product.findByIdAndUpdate(
+      productId,
+      {
+        stock,
+        updatedAt: new Date()
+      },
+      {
+        new: true,
+        runValidators: true
       }
-  
-      const product = await Product.findById(productId);
-      if (!product) {
-        return res.status(404).json({ message: "Produit non trouvé." });
-      }
-  
-      product.stock = stock;
-      product.updatedAt = Date.now();
-  
-      await product.save();
-  
-      res.json({ message: "Stock mis à jour avec succès.", product });
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du stock :", error);
-      res.status(500).json({ message: "Erreur serveur." });
+    );
+
+    if (!product) {
+      return res.status(404).json({ message: 'Produit introuvable' });
     }
-  };
+
+    res.json({
+      message: 'Stock mis à jour',
+      product
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+};
