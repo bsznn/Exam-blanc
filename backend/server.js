@@ -9,13 +9,14 @@ const morgan = require('morgan');
 const app = express();
 connectDB();
 
-// 🔐 Sécurité HTTP headers
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // désactive temporairement CSP
+}));
 
 app.use(express.json({ limit: '10kb' }));
 
 app.use(cors({
-  origin: "https://exam-blanc.onrender.com/",
+  origin: "https://exam-blanc.onrender.com",
   credentials: true
 }));
 
