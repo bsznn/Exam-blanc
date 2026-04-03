@@ -1,9 +1,5 @@
 // gateway/routes/stock.js
 const express = require('express');
-const proxy = require('express-http-proxy');
-require('dotenv').config();
-// gateway/routes/stock.js
-const express = require('express');
 const lazyProxy = require('../utils/lazyProxy');
 const router = express.Router();
 
