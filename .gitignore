@@ -19,7 +19,6 @@ docker-compose.override.yml
 
 # Build
 dist/
-build/
 *.exe
 
 # MongoDB
