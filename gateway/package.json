@@ -1,0 +1,26 @@
+{
+  "name": "gateway",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js",
+    "start:gateway": "nodemon server.js",
+    "start:notifi": "nodemon ../microservices/notifications/index.js",
+    "start:stock": "nodemon ../microservices/stock-management/index.js",
+    "start:all": "concurrently \"npm run start:gateway\" \"npm run start:notifi\" \"npm run start:stock\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-http-proxy": "^2.1.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "nodemon": "^3.0.0"
+  }
+}
